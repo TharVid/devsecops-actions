@@ -1,5 +1,9 @@
 name: "Secrets Scanning with GitLeaks"
 
+permissions:
+  pull-requests: write
+  issues: write
+
 on:
   pull_request:
     types: [opened, synchronize]
@@ -27,6 +31,7 @@ jobs:
       - name: "Check for Secrets"
         id: check_secrets
         run: |
+          cat gitleaks-report.json
           if [ -s gitleaks-report.json ]; then
             echo "secrets_detected=true" >> $GITHUB_ENV
           else
@@ -37,7 +42,7 @@ jobs:
         id: set_comment_content
         run: |
           if [ "${{ env.secrets_detected }}" == "true" ]; then
-            comment=$(jq -r '.[] | "- File: \(.file)\n  Line: \(.line)\n  Secret: \(.description)"' gitleaks-report.json)
+            comment=$(jq -r '.[] | "- File: \(.file // "unknown file")\n  Line: \(.line // "unknown line")\n  Secret: \(.description // "unknown secret")"' gitleaks-report.json)
             full_comment=":x: Secrets detected by GitLeaks:\n\n${comment}"
           else
             full_comment=":white_check_mark: No secrets detected by GitLeaks."
