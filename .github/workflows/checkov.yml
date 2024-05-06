@@ -23,6 +23,7 @@ jobs:
           framework: terraform
           output_format: "json"
           output_file_path: "checkov_results.json"
+        continue-on-error: true
 
       - name: "Parse Checkov Output"
         id: parse_output
