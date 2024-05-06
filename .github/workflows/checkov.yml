@@ -1,16 +1,44 @@
-name: checkov-job
+name: "Checkov Job"
+
 on:
-  push:
-    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize]
+
 jobs:
   checkov-job:
+    name: "Checkov Action"
     runs-on: ubuntu-latest
-    name: checkov-action
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@master
-      - name: Run Checkov action
+      - name: "Checkout Repo"
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: "Run Checkov"
         id: checkov
         uses: bridgecrewio/checkov-action@master
         with:
-          directory: infra/
+          directory: .
+          framework: terraform
+
+      - name: "Post Checkov PR Comment"
+        uses: actions/github-script@v6
+        if: ${{ always() }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { CHECKOV_SUMMARY, CHECKOV_OUTPUT } = process.env;
+            const summary = CHECKOV_SUMMARY ? `### Checkov Summary\n${CHECKOV_SUMMARY}\n` : 'No summary available';
+            const output = CHECKOV_OUTPUT ? `### Checkov Output\n<details><summary>Log output</summary>\n\n${CHECKOV_OUTPUT}\n</details>` : 'No output available';
+
+            const body = `${summary}\n${output}`;
+
+            github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body
+            })
+        env:
+          CHECKOV_SUMMARY: ${{ steps.checkov.outputs.summary }}
+          CHECKOV_OUTPUT: ${{ steps.checkov.outputs.output }}
