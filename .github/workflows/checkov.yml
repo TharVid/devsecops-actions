@@ -27,7 +27,7 @@ jobs:
       - name: "Parse Checkov Output"
         id: parse_output
         run: |
-          # Install jq
+          # Install jq if needed
           sudo apt-get update && sudo apt-get install -y jq
 
           # Extract failed checks only from the Checkov output
@@ -36,19 +36,18 @@ jobs:
             "- **Check:** \(.check_id) - \(.check_name)\n  **File:** \(.file_path)\n  **Resource:** \(.resource)\n  **Guide:** [\(.guideline)](\(.guideline))"
           ) | join("\n\n")
           EOF
-          
+
           output=$(jq -f filter_failed_checks.jq < checkov_results.json)
 
           # Default message if no output
           if [ -z "$output" ]; then
             output=":white_check_mark: No failed checks found."
           fi
-          
+
           echo "::set-output name=checkov_output::$output"
 
       - name: "Post Checkov PR Comment"
         uses: actions/github-script@v6
-        if: ${{ always() }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
