@@ -1,57 +1,40 @@
-name: "Secrets Scanning with GitLeaks"
+# Copyright © 2022 Gitleaks LLC - All Rights Reserved.
+# You may use this code under the terms of the GITLEAKS-ACTION END-USER LICENSE AGREEMENT,
+# which can be found here: https://github.com/gitleaks/gitleaks-action/blob/4036f303133f36c5017e03c31446353f31572e9e/COMMERCIAL-LICENSE.txt
 
-permissions:
-  pull-requests: write
-  issues: write
-
-on:
-  pull_request:
-    types: [opened, synchronize]
-
+name: gitleaks-action
+on: [pull_request, push, workflow_dispatch]
 jobs:
-  gitleaks-scan:
-    name: "Run GitLeaks Scan"
+  scan:
+    name: gitleaks-action
     runs-on: ubuntu-latest
-
     steps:
-      - name: "Checkout Code"
-        uses: actions/checkout@v3
-
-      - name: "Install GitLeaks"
-        run: |
-          curl -sSL -o /tmp/gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.16.2/gitleaks_8.16.2_linux_x64.tar.gz
-          tar -zxvf /tmp/gitleaks.tar.gz -C /tmp gitleaks
-          sudo mv /tmp/gitleaks /usr/local/bin/
-
-      - name: "Run GitLeaks"
-        id: gitleaks
-        run: |
-          gitleaks detect --source . --report-format json --report-path gitleaks-report.json || exit 0
-
-      - name: "Check for Secrets"
-        id: check_secrets
-        run: |
-          cat gitleaks-report.json
-          if [ -s gitleaks-report.json ]; then
-            echo "secrets_detected=true" >> $GITHUB_ENV
-          else
-            echo "secrets_detected=false" >> $GITHUB_ENV
-          fi
-
-      - name: "Set Comment Content"
-        id: set_comment_content
-        run: |
-          if [ "${{ env.secrets_detected }}" == "true" ]; then
-            comment=$(jq -r '.[] | "- File: \(.file // "unknown file")\n  Line: \(.line // "unknown line")\n  Secret: \(.description // "unknown secret")"' gitleaks-report.json)
-            full_comment=":x: Secrets detected by GitLeaks:\n\n${comment}"
-          else
-            full_comment=":white_check_mark: No secrets detected by GitLeaks."
-          fi
-          echo "::set-output name=comment::${full_comment}"
-
-      - name: "Add Comment"
-        uses: peter-evans/create-or-update-comment@v3
+      - uses: actions/checkout@v3
         with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: ${{ steps.set_comment_content.outputs.comment }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - run: wget https://raw.githubusercontent.com/zricethezav/gitleaks/master/config/gitleaks.toml
+      - uses: gitleaks/gitleaks-action@demo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This variable is automatically assigned by GitHub when any action gets kicked off.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}} # Only required for Organizations, not personal accounts.
+          GITLEAKS_CONFIG: configs/gitleaks.toml
+          GITLEAKS_NOTIFY_USER_LIST: "@weineran"
+  process_report:
+    name: Process Report
+    if: always()
+    needs: [scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Report
+        uses: actions/download-artifact@v3
+        with:
+          name: gitleaks-results.sarif
+
+      - name: Show downloaded files
+        run: ls -R
+
+      - name: List secret locations
+        run: |
+          jq --raw-output \
+          '.runs[].results[].locations[].physicalLocation | "\(.artifactLocation.uri):\(.region.startLine)"' \
+          "work/app/app/results.sarif"
