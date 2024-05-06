@@ -25,6 +25,12 @@ jobs:
           output_file_path: "checkov_results.json"
         continue-on-error: true
 
+      - name: "Upload Checkov Results"
+        uses: actions/upload-artifact@v3
+        with:
+          name: checkov-results
+          path: checkov_results.json
+
       - name: "Parse Checkov Output"
         id: parse_output
         continue-on-error: true
@@ -32,19 +38,18 @@ jobs:
           # Ensure jq is installed
           sudo apt-get update && sudo apt-get install -y jq || true
 
-          # Extract failed checks only from the Checkov output
+          # Extract failed check count and a summary message from the Checkov output
           if [ -f checkov_results.json ]; then
-            cat <<EOF > filter_failed_checks.jq
-            .results.failed_checks | map(
-              "- **Check:** \(.check_id) - \(.check_name)\n  **File:** \(.file_path)\n  **Resource:** \(.resource)\n  **Guide:** [\(.guideline)](\(.guideline))"
-            ) | join("\n\n")
-            EOF
+            failed_count=$(jq '.results.failed_checks | length' checkov_results.json 2>/dev/null) || failed_count=0
+            passed_count=$(jq '.results.passed_checks | length' checkov_results.json 2>/dev/null) || passed_count=0
+            suppressed_count=$(jq '.results.suppressed_checks | length' checkov_results.json 2>/dev/null) || suppressed_count=0
 
-            output=$(jq -f filter_failed_checks.jq checkov_results.json 2>/dev/null) || output=""
+            output="### Checkov Results\n\n- **Passed Checks:** $passed_count\n- **Failed Checks:** $failed_count\n- **Suppressed Checks:** $suppressed_count\n\n"
 
-            # Default message if no output
-            if [ -z "$output" ]; then
-              output=":white_check_mark: No failed checks found."
+            if [ "$failed_count" -gt 0 ]; then
+              output="${output}:x: Some checks failed! Please [download the full Checkov report](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) to see the details."
+            else
+              output="${output}:white_check_mark: All checks passed!"
             fi
           else
             output=":warning: Checkov results not found or Checkov failed."
