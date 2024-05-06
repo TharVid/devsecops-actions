@@ -1,6 +1,6 @@
 # example_code.py
 v
-# Hardcoded AWS Access Key and Secret vKey (just for example purposes)
+# Hardcoded AWS Access Key and Secret vKey (just for examplex purposes)
 aws_access_key_id = "AKIAEXAMPLE12345678"
 aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
