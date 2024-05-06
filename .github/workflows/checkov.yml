@@ -21,10 +21,15 @@ jobs:
         with:
           directory: .
           framework: terraform
+          output_format: "json"
+          output_file_path: "checkov_results.json"
 
       - name: "Parse Checkov Output"
         id: parse_output
         run: |
+          # Install jq
+          sudo apt-get update && sudo apt-get install -y jq
+
           # Extract failed checks only from the Checkov output
           cat <<EOF > filter_failed_checks.jq
           .results.failed_checks | map(
@@ -32,11 +37,11 @@ jobs:
           ) | join("\n\n")
           EOF
           
-          output=$(jq -f filter_failed_checks.jq < ${{ steps.checkov.outputs.output_file }})
+          output=$(jq -f filter_failed_checks.jq < checkov_results.json)
 
           # Default message if no output
           if [ -z "$output" ]; then
-            output="No failed checks found."
+            output=":white_check_mark: No failed checks found."
           fi
           
           echo "::set-output name=checkov_output::$output"
