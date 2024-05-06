@@ -1,4 +1,4 @@
-# main.tf
+# mainx.tf
 
 resource "aws_s3_bucket" "vulnerable_bucket" {
   bucket = "vulnerable-bucket-example"
